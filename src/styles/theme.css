@@ -1,0 +1,16 @@
+:root {
+  /* brand */
+  --color-brand-500: 99 75 222;      /* #634BDE */
+  --color-brand-400: 146 131 192;    /* #9283C0 */
+
+  /* background */
+  --color-bg-body: 246 250 255;      /* #F6FAFF */
+
+  /* base */
+  --color-black: 0 0 0;
+  --color-white: 255 255 255;
+
+  /* semantic (на будущее) */
+  --color-success-600: 34 197 94;    /* green */
+  --color-danger-600: 239 68 68;     /* red */
+}
