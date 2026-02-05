@@ -1,6 +1,9 @@
 import QRCodeStyling from "qr-code-styling";
 import { downloadZip, type InputWithSizeMeta } from "client-zip";
-import { buildQrCodeOptions } from "./buildQrCodeOptions";
+import {
+  buildQrCodeOptions,
+  getEffectiveQuietZonePx,
+} from "./buildQrCodeOptions";
 import { applyBackgroundToQrSvg } from "./applyBackgroundToQrSvg";
 import { applySignatureToQrSvg } from "./applySignatureToQrSvg";
 
@@ -73,8 +76,17 @@ export async function generateQrZipWithProgress({
   const generationErrors: RegistryGenerationError[] = [];
 
   const safeZoneEnabled = Boolean(qrSettings.hasSafeZone);
-  const safeZoneMargin = safeZoneEnabled ? Number(qrSettings.safeZoneSizePx || 0) : 0;
-  const safeZoneFill = safeZoneEnabled ? String(qrSettings.safeZoneColor || "#FFFFFF") : "";
+  const safeZoneMargin = safeZoneEnabled
+    ? getEffectiveQuietZonePx(
+        qrSettings.sizePx,
+        Number(qrSettings.safeZoneSizePx || 0),
+      )
+    : 0;
+
+  const safeZoneFill = safeZoneEnabled
+    ? String(qrSettings.safeZoneColor || "#FFFFFF")
+    : "";
+
   const innerFill = String(qrSettings.backgroundColor || "#FFFFFF");
 
   const shouldForceTransparentBg = Boolean(backgroundDataUrl) || safeZoneEnabled;
@@ -91,7 +103,9 @@ export async function generateQrZipWithProgress({
           qrSettings,
           logoBase64,
           qrColor: "#000000",
-          backgroundFallbackColor: shouldForceTransparentBg ? "transparent" : "#ffffff",
+          backgroundFallbackColor: shouldForceTransparentBg
+            ? "transparent"
+            : "#ffffff",
           forceTransparentBackground: shouldForceTransparentBg,
         }),
       );
@@ -99,11 +113,6 @@ export async function generateQrZipWithProgress({
       const svgBlob = await qrCode.getRawData("svg");
       const svgText = await svgBlob.text();
 
-      // Собираем фон в итоговом SVG:
-      // 1) baseFill на всю область (это safe zone)
-      // 2) innerFill внутри safe zone
-      // 3) bg image внутри safe zone (если есть)
-      // 4) overlay внутри safe zone (если есть)
       const svgWithBackground = applyBackgroundToQrSvg(svgText, backgroundDataUrl, {
         marginPx: safeZoneMargin,
         baseFill: safeZoneFill,
@@ -119,7 +128,6 @@ export async function generateQrZipWithProgress({
         text: String((qrSettings as any).signatureText ?? ""),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         borderColor: String((qrSettings as any).signatureBorderColor ?? "#000000"),
-        // фон под подписью — это текущий backgroundColor
         backgroundColor: innerFill,
         sizePx: qrSettings.sizePx,
       });
@@ -159,6 +167,13 @@ export async function generateQrZipWithProgress({
       name: `generation_errors_${new Date().toISOString().slice(0, 19)}.csv`,
     });
   }
+
+  onProgress?.({
+    done: total,
+    total,
+    errors: generationErrors.length,
+    statusText: "Сбор архива…",
+  });
 
   const zip = await downloadZip(files).blob();
 

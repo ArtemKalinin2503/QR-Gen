@@ -39,6 +39,10 @@ export const LogoTab = () => {
 
   const isLogoSelected = Boolean(logo.dataUrl);
 
+  const qrSizePx = qrSettings.sizePx;
+  const maxLogoSizePx = Math.floor(qrSizePx * 0.3);
+  const isLogoSizeLimited = qrSettings.logoSizePx > maxLogoSizePx;
+
   return (
     <div className="pt-6">
       <FileUploadField
@@ -55,7 +59,7 @@ export const LogoTab = () => {
         previewSrc={logo.dataUrl}
       />
 
-      <div className="mt-6 grid gap-4">
+      <div className="mt-[20px] grid gap-4">
         <Box sx={{ opacity: isLogoSelected ? 1 : 0.5 }}>
           <ZoneColorField
             label="Цвет фона"
@@ -71,13 +75,22 @@ export const LogoTab = () => {
           label="Размер логотипа"
           value={qrSettings.logoSizePx}
           onChange={(nextValue) => {
-            if (typeof nextValue !== "number") return;
+            if (nextValue === "") {
+              setQrSettings({ logoSizePx: 0 });
+              return;
+            }
             setQrSettings({ logoSizePx: nextValue });
           }}
-          min={1}
           step={1}
+          clampOnBlur={false}
           disabled={!isLogoSelected}
         />
+
+        {isLogoSelected && qrSettings.logoSizePx > 0 && isLogoSizeLimited && (
+          <div className="mt-2 text-[12px] leading-[16px] text-[#667085]">
+            Максимальный размер логотипа — {maxLogoSizePx}px (30% от размера QR). В результате значение будет ограничено.
+          </div>
+        )}
       </div>
     </div>
   );

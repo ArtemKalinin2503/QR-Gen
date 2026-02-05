@@ -26,51 +26,71 @@ const FormTextField = ({
   type = "text",
   className,
 }: FormTextFieldProps) => {
+  const resolvedLabel = (label || placeholder || "").trim();
+
   return (
     <div className={className}>
-      <div className="mb-[5px] text-[14px] font-normal text-[#9283C0]">
-        {label}
-      </div>
-
       <Controller
         control={control}
         name={name}
-        render={({ field }) => (
-          <OutlinedInput
-            value={typeof field.value === "string" ? field.value : ""}
-            onChange={(event) => field.onChange(event.target.value)}
-            placeholder={placeholder}
-            type={type}
-            sx={{
-              width: "100%",
-              height: "44px",
-              borderRadius: "8px",
-              backgroundColor: "#FFFFFF",
-              fontFamily: "Inter, sans-serif",
+        render={({ field }) => {
+          const value = typeof field.value === "string" ? field.value : "";
+          const hasValue = Boolean(value.trim());
 
-              "& .MuiOutlinedInput-notchedOutline": {
-                borderColor: "#9283C0",
-              },
-              "&:hover .MuiOutlinedInput-notchedOutline": {
-                borderColor: "#9283C0",
-              },
-              "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                borderColor: "#9283C0",
-                borderWidth: "1px",
-              },
+          return (
+            <div className="relative">
+              {hasValue && resolvedLabel && (
+                <div
+                  className="pointer-events-none absolute left-[8px] top-[4px] z-10 bg-white px-[4px] text-[12px] font-normal leading-[16px]"
+                  style={{ color: "#9283C0" }}
+                >
+                  {resolvedLabel}
+                </div>
+              )}
 
-              "& .MuiOutlinedInput-input": {
-                padding: "0 10px",
-                height: "44px",
-                fontSize: "14px",
-                fontWeight: 400,
-                color: "#313131",
-                fontFamily: "Inter, sans-serif",
-                lineHeight: 1,
-              },
-            }}
-          />
-        )}
+              <OutlinedInput
+                value={value}
+                onChange={(event) => field.onChange(event.target.value)}
+                placeholder={placeholder}
+                type={type}
+                sx={{
+                  width: "100%",
+                  height: "45px",
+                  borderRadius: "8px",
+                  backgroundColor: "#FFFFFF",
+                  fontFamily: "Inter, sans-serif",
+
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "#9283C0",
+                  },
+                  "&:hover .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "#9283C0",
+                  },
+                  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "#9283C0",
+                    borderWidth: "1px",
+                  },
+
+                  "& .MuiOutlinedInput-input": {
+                    padding: hasValue ? "20px 12px 8px" : "0 12px",
+                    height: "45px",
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    color: "#313131",
+                    fontFamily: "Inter, sans-serif",
+                    lineHeight: 1.2,
+                    boxSizing: "border-box",
+                  },
+
+                  "& .MuiOutlinedInput-input::placeholder": {
+                    color: "#9283C0",
+                    opacity: 1,
+                  },
+                }}
+              />
+            </div>
+          );
+        }}
       />
     </div>
   );

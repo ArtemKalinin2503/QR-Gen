@@ -10,25 +10,19 @@ type SelectedFile = {
 
 type FileUploadFieldProps = {
   title: string;
-
   accept: Accept;
   formatsHint: string;
-
   selectedFile: SelectedFile | null;
   isDisabledSelect?: boolean;
-
   emptyStateText?: string;
   icon: ReactNode;
-
   onFileSelected: (file: File) => Promise<void>;
   onDelete: () => void;
-
   error?: string;
   onError?: (message: string) => void;
-
   showPreviewImage?: boolean;
-
   previewSrc?: string | null;
+  footer?: ReactNode;
 };
 
 const formatFileSize = (bytes: number) => {
@@ -57,6 +51,7 @@ export const FileUploadField = ({
   onError,
   showPreviewImage = false,
   previewSrc = null,
+  footer,
 }: FileUploadFieldProps) => {
   const isFileSelected = Boolean(selectedFile);
 
@@ -86,7 +81,8 @@ export const FileUploadField = ({
       <div
         {...getRootProps()}
         className={[
-          "w-full max-w-[440px] h-[116px] rounded-[10px] px-[8px] items-start mt-[22px]",
+          "w-full max-w-[440px] rounded-[10px] px-[8px] items-start mt-[20px]",
+          isFileSelected ? "h-[40px]" : "h-[116px]",
           isDisabledSelect
             ? "cursor-not-allowed opacity-60"
             : isFileSelected
@@ -95,7 +91,7 @@ export const FileUploadField = ({
           isFileSelected ? "bg-white" : "border border-dashed border-brand-500",
           isDragActive && !isFileSelected ? "bg-brand-50" : "bg-white",
           isFileSelected
-            ? "flex"
+            ? "flex items-center"
             : "flex flex-col items-center justify-center text-center",
         ].join(" ")}
       >
@@ -115,7 +111,7 @@ export const FileUploadField = ({
         )}
 
         {isFileSelected && selectedFile && (
-          <div className="flex w-full items-center gap-[60px]">
+          <div className="flex w-full items-center justify-between">
             <div className="flex min-w-0 items-center gap-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-brand-200 text-[12px] font-normal text-brand-500 overflow-hidden">
                 {shouldShowPreview ? (
@@ -161,7 +157,9 @@ export const FileUploadField = ({
         )}
       </div>
 
-      {error && (
+      {isFileSelected && footer && <div className="mt-4">{footer}</div>}
+
+      {!isFileSelected && error && (
         <div className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>

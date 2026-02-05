@@ -124,7 +124,7 @@ const initialUploadFileState: UploadFileState = {
 
 const getInitialQrSettingsState = (): QrSettingsState => ({
   sizePx: 1000,
-  hasSafeZone: true,
+  hasSafeZone: false,
   safeZoneColor: "#FFFFFF",
   safeZoneSizePx: 16,
 
@@ -148,7 +148,7 @@ const getInitialQrSettingsState = (): QrSettingsState => ({
   logoBackgroundColor: "#FFFFFF",
   logoSizePx: 100,
 
-  backgroundColor: "#FFFFFF",
+  backgroundColor: "",
   backgroundAutoPickEnabled: false,
 
   signatureEnabled: false,
@@ -168,8 +168,8 @@ export const useQrGeneratorStore = create<QrGeneratorState>((set) => ({
   qrSettingsResetVersion: 0,
 
   setQrSettings: (payload) =>
-    set((state) => ({
-      qrSettings: {
+    set((state) => {
+      const nextQrSettings = {
         ...state.qrSettings,
         ...payload,
         dynamicFields: payload.dynamicFields
@@ -178,8 +178,10 @@ export const useQrGeneratorStore = create<QrGeneratorState>((set) => ({
               ...payload.dynamicFields,
             }
           : state.qrSettings.dynamicFields,
-      },
-    })),
+      };
+
+      return { qrSettings: nextQrSettings };
+    }),
 
   resetQrSettings: () =>
     set((state) => ({
@@ -208,7 +210,6 @@ export const useQrGeneratorStore = create<QrGeneratorState>((set) => ({
         rows: [],
         rowsCount: 0,
         error: message,
-
         validationErrors: [],
         isValidationModalOpen: false,
       },

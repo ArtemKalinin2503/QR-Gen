@@ -10,13 +10,15 @@ import { generateQrZipWithProgress } from "../lib/generateQrZipWithProgress";
 import { useQrGeneratorStore } from "../../../store/qrGenerator.store";
 import { buildQrCodeOptions } from "../lib/buildQrCodeOptions";
 
-const PREVIEW_SIZE = 400;
 const IMAGE_EXTENSION = "svg";
 
 const QR_COLOR = "#111827";
 const BG_COLOR = "#FFFFFF";
 
-const OVERLAY_ALPHA = 0.35;
+// фон страницы под превью (когда не выбран фон-картинка)
+const PAGE_BG_COLOR = "#F5F7FF";
+
+export const OVERLAY_ALPHA = 0.35;
 const UPDATE_DEBOUNCE_MS = 90;
 
 type QrPreviewPanelProps = {
@@ -88,6 +90,20 @@ const buildPreviewData = (
   return "";
 };
 
+const getSquareSize = (element: HTMLElement) => {
+  const rect = element.getBoundingClientRect();
+  const height = rect.height || rect.width;
+  return Math.floor(Math.min(rect.width, height));
+};
+
+const getMinQuietZonePreviewPx = (previewSize: number) => {
+  const approxModulePx = previewSize / 41;
+  const minByModules = 4 * approxModulePx;
+  const minByPercent = previewSize * 0.1;
+
+  return Math.ceil(Math.max(minByModules, minByPercent));
+};
+
 export const QrPreviewPanel = ({ generatorType }: QrPreviewPanelProps) => {
   const [error, setError] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -139,11 +155,68 @@ export const QrPreviewPanel = ({ generatorType }: QrPreviewPanelProps) => {
   const safeZoneSizePx = useQrGeneratorStore((s) => s.qrSettings.safeZoneSizePx);
   const sizePx = useQrGeneratorStore((s) => s.qrSettings.sizePx);
 
-  const previewScale = sizePx > 0 ? PREVIEW_SIZE / sizePx : 0.4;
+  const normalizedUrl = String(dynamicFields.url ?? "").trim();
+  const normalizedText = String(dynamicFields.text ?? "").trim();
+  const normalizedEmail = String(dynamicFields.email ?? "").trim();
+
+  const hasAnyBusinessCardField = [
+    dynamicFields.firstName,
+    dynamicFields.lastName,
+    dynamicFields.middleName,
+    dynamicFields.phone,
+    dynamicFields.email,
+    dynamicFields.company,
+    dynamicFields.position,
+  ]
+    .map((value) => String(value ?? "").trim())
+    .some(Boolean);
+
+  // размер превью — по контейнеру внутри рамки
+  const previewHostRef = useRef<HTMLDivElement | null>(null);
+  const [previewSizePx, setPreviewSizePx] = useState(400);
+
+  useEffect(() => {
+    const element = previewHostRef.current;
+    if (!element) return;
+
+    let rafId = 0;
+
+    const updateSize = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+
+      rafId = requestAnimationFrame(() => {
+        const nextSize = getSquareSize(element);
+
+        // защита от временных значений (0 / маленьких), из-за которых превью “схлопывается”
+        if (nextSize < 200) return;
+
+        setPreviewSizePx((prev) => (prev === nextSize ? prev : nextSize));
+      });
+    };
+
+    updateSize();
+
+    const observer = new ResizeObserver(() => updateSize());
+    observer.observe(element);
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
+  }, []);
+
+  const previewScale = sizePx > 0 ? previewSizePx / sizePx : 0.4;
+
+  // В превью показываем минимум зоны (чтобы это выглядело “заливкой”, а не линией)
   const safeZonePreviewPx = hasSafeZone
-    ? Math.max(0, Math.round(safeZoneSizePx * previewScale))
+    ? Math.max(
+        0,
+        Math.round(safeZoneSizePx * previewScale),
+        getMinQuietZonePreviewPx(previewSizePx),
+      )
     : 0;
 
+  // safe zone рисуем UI-слоем (inset), поэтому внутри QR margin выключаем
   const qrSettingsForQr = useQrGeneratorStore(
     useShallow((s) => {
       const q = s.qrSettings;
@@ -151,9 +224,9 @@ export const QrPreviewPanel = ({ generatorType }: QrPreviewPanelProps) => {
 
       return {
         sizePx: q.sizePx,
-        hasSafeZone: q.hasSafeZone,
+        hasSafeZone: false,
         safeZoneColor: q.safeZoneColor,
-        safeZoneSizePx: q.safeZoneSizePx,
+        safeZoneSizePx: 0,
 
         lineThickness: q.lineThickness,
         verticalAlignmentScale: q.verticalAlignmentScale,
@@ -182,10 +255,16 @@ export const QrPreviewPanel = ({ generatorType }: QrPreviewPanelProps) => {
     }),
   );
 
-  const previewData = useMemo(() => {
+  const previewDataBase = useMemo(() => {
     if (generatorType === "registry") return registryPreviewData;
     return buildPreviewData(generatorType, dynamicFields);
   }, [generatorType, registryPreviewData, dynamicFields]);
+
+  const previewData =
+    (generatorType === "registry" && rowsCount === 0) ||
+    (generatorType === "businessCard" && !hasAnyBusinessCardField)
+      ? ""
+      : previewDataBase;
 
   const previewDataForRender = previewData || " ";
 
@@ -193,9 +272,18 @@ export const QrPreviewPanel = ({ generatorType }: QrPreviewPanelProps) => {
     generatorType === "registry" && registryValidationErrorsCount > 0;
 
   const canGenerate =
-    generatorType === "registry"
-      ? rowsCount > 0 && !hasRegistryValidationErrors
-      : Boolean(previewData);
+    (generatorType === "registry" && rowsCount > 0 && !hasRegistryValidationErrors) ||
+    (generatorType === "individual" && Boolean(normalizedUrl)) ||
+    (generatorType === "text" && Boolean(normalizedText)) ||
+    (generatorType === "email" && Boolean(normalizedEmail)) ||
+    (generatorType === "businessCard" && hasAnyBusinessCardField);
+
+  const shouldDimPreview =
+    (generatorType === "registry" && rowsCount === 0) ||
+    (generatorType === "individual" && !normalizedUrl) ||
+    (generatorType === "text" && !normalizedText) ||
+    (generatorType === "email" && !normalizedEmail) ||
+    (generatorType === "businessCard" && !hasAnyBusinessCardField);
 
   const isGenerateDisabled = !canGenerate || isGenerating;
 
@@ -248,8 +336,8 @@ export const QrPreviewPanel = ({ generatorType }: QrPreviewPanelProps) => {
     if (!qrContainerRef.current) return;
 
     const qrCode = new QRCodeStyling({
-      width: PREVIEW_SIZE,
-      height: PREVIEW_SIZE,
+      width: previewSizePx,
+      height: previewSizePx,
       type: "svg",
       data: " ",
       margin: 0,
@@ -261,6 +349,7 @@ export const QrPreviewPanel = ({ generatorType }: QrPreviewPanelProps) => {
     });
 
     qrInstanceRef.current = qrCode;
+    qrContainerRef.current.innerHTML = "";
     qrCode.append(qrContainerRef.current);
 
     requestAnimationFrame(() => {
@@ -287,24 +376,34 @@ export const QrPreviewPanel = ({ generatorType }: QrPreviewPanelProps) => {
       qrInstanceRef.current = null;
       pendingOptionsRef.current = null;
     };
-  }, []);
+  }, [previewSizePx]);
 
   useEffect(() => {
     const hasBgImage = Boolean(backgroundDataUrl);
+    const normalizedBackgroundColor = String(qrSettingsForQr.backgroundColor || "").trim();
+    const backgroundFallbackColor = hasBgImage
+      ? "transparent"
+      : (normalizedBackgroundColor ? BG_COLOR : "transparent");
 
     const nextOptions = buildQrCodeOptions({
       data: previewDataForRender,
-      sizePx: PREVIEW_SIZE,
+      sizePx: previewSizePx,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       qrSettings: qrSettingsForQr as any,
       logoBase64: logoDataUrl ?? null,
       qrColor: QR_COLOR,
-      backgroundFallbackColor: hasBgImage ? "transparent" : BG_COLOR,
+      backgroundFallbackColor,
       forceTransparentBackground: hasBgImage,
     });
 
     scheduleUpdate(nextOptions);
-  }, [backgroundDataUrl, logoDataUrl, previewDataForRender, qrSettingsForQr]);
+  }, [
+    backgroundDataUrl,
+    logoDataUrl,
+    previewDataForRender,
+    qrSettingsForQr,
+    previewSizePx,
+  ]);
 
   const onGenerateClick = () => {
     setError("");
@@ -419,30 +518,38 @@ export const QrPreviewPanel = ({ generatorType }: QrPreviewPanelProps) => {
   const signatureLabel = (signatureText || "").trim();
   const shouldShowSignature = signatureEnabled && Boolean(signatureLabel);
 
-  const shouldShowOverlay = Boolean(backgroundDataUrl);
+  const hasBgImage = Boolean(backgroundDataUrl);
+  const shouldShowOverlay = hasBgImage;
+  // Когда нет фон-картинки — под QR должен быть фон страницы (светло-серый)
+  const previewBaseBackground = hasBgImage
+    ? overlayColor || BG_COLOR
+    : PAGE_BG_COLOR;
 
   const previewCardStyle: React.CSSProperties = {
-    width: PREVIEW_SIZE,
+    width: previewSizePx,
     borderRadius: 10,
     overflow: "hidden",
     boxSizing: "border-box",
-    border: `3px solid ${signatureBorderColor}`,
-    backgroundColor: signatureBorderColor,
   };
 
   const previewOuterStyle: React.CSSProperties = {
     width: "100%",
-    height: PREVIEW_SIZE,
-    backgroundColor: hasSafeZone ? safeZoneColor : overlayColor || BG_COLOR,
+    height: previewSizePx,
+    backgroundColor: hasSafeZone ? safeZoneColor : previewBaseBackground,
     position: "relative",
   };
+
+  const normalizedOverlayColor = String(overlayColor || "").trim();
 
   const previewInnerStyle: React.CSSProperties = {
     position: "absolute",
     inset: safeZonePreviewPx,
     overflow: "hidden",
-    backgroundColor: overlayColor || BG_COLOR,
-    backgroundImage: backgroundDataUrl ? `url(${backgroundDataUrl})` : undefined,
+    // если нет bg-image — фон прозрачный, чтобы “просвечивал” previewOuterStyle
+    backgroundColor: hasBgImage
+      ? normalizedOverlayColor || BG_COLOR
+      : normalizedOverlayColor || PAGE_BG_COLOR,
+    backgroundImage: hasBgImage ? `url(${backgroundDataUrl})` : undefined,
     backgroundSize: "cover",
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",
@@ -450,8 +557,12 @@ export const QrPreviewPanel = ({ generatorType }: QrPreviewPanelProps) => {
 
   return (
     <div>
-      <div className="rounded-[10px] border border-brand-500 p-[28px]">
-        <div className="flex items-center justify-center overflow-hidden rounded-[10px]">
+      <div
+        className={`rounded-[10px] border border-brand-500 ${
+          hasSafeZone ? "p-0" : "p-[28px]"
+        } ${shouldDimPreview ? "opacity-50" : "opacity-100"}`}
+      >
+        <div ref={previewHostRef} className="w-full aspect-square">
           <div style={previewCardStyle}>
             <div style={previewOuterStyle}>
               <div style={previewInnerStyle}>

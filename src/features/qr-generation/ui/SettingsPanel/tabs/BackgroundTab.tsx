@@ -1,7 +1,7 @@
-import { Box, Switch, Typography } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
+import { Box, Switch, Typography } from "@mui/material";
+import { MuiColorInput } from "mui-color-input";
 import { FileUploadField } from "../../../../../shared/ui/file-upload/FileUploadField";
-import { ZoneColorField } from "../../../../../shared/ui/inputs/ZoneColorField";
 import { useQrGeneratorStore } from "../../../../../store/qrGenerator.store";
 import { fileToDataUrl } from "../../../lib/fileToDataUrl";
 import { autoPickOverlayColor } from "../../../lib/autoPickOverlayColor";
@@ -13,6 +13,10 @@ const BG_ACCEPT = {
 } as const;
 
 const BG_FORMATS_HINT = "SVG, PNG, JPG, JPEG";
+
+const OVERLAY_ALPHA = 0.35;
+
+const normalizeHex = (value: string) => String(value || "").trim();
 
 export const BackgroundTab = () => {
   const background = useQrGeneratorStore((s) => s.background);
@@ -39,8 +43,8 @@ export const BackgroundTab = () => {
 
   const isBgSelected = Boolean(background.dataUrl);
 
-  // основной цвет QR (для контраста)
-  const qrMainColor = qrSettings.dotsColor || "#000000";
+  // основной цвет модулей QR (для контраста)
+  const qrMainColor = normalizeHex(qrSettings.dotsColor) || "#000000";
 
   const lastAutoPickedRef = useRef<string | null>(null);
   const [isAutoPicking, setIsAutoPicking] = useState(false);
@@ -50,21 +54,21 @@ export const BackgroundTab = () => {
     if (!bg) return;
 
     setIsAutoPicking(true);
-    try {
-      const next = await autoPickOverlayColor({
-        bgDataUrl: bg,
-        qrHexColor: qrMainColor,
-        minContrast: 4.5,
-      });
 
-      if (!next) return;
-      if (lastAutoPickedRef.current === next) return;
+    const next = await autoPickOverlayColor({
+      bgDataUrl: bg,
+      qrHexColor: qrMainColor,
+      overlayAlpha: OVERLAY_ALPHA,
+      minContrast: 4.5,
+    });
 
-      lastAutoPickedRef.current = next;
-      setQrSettings({ backgroundColor: next });
-    } finally {
-      setIsAutoPicking(false);
-    }
+    setIsAutoPicking(false);
+
+    if (!next) return;
+    if (lastAutoPickedRef.current === next) return;
+
+    lastAutoPickedRef.current = next;
+    setQrSettings({ backgroundColor: next });
   };
 
   // 1) При включенном автоподборе пересчитываем при смене картинки/цвета QR
@@ -89,10 +93,24 @@ export const BackgroundTab = () => {
     setQrSettings({ backgroundAutoPickEnabled: checked });
     lastAutoPickedRef.current = null;
 
-    // при включении — сразу пересчитать и обновить backgroundColor
     if (checked && background.dataUrl) {
       await runAutoPick();
     }
+  };
+
+  const backgroundColorRaw = normalizeHex(qrSettings.backgroundColor);
+
+  const isTransparent = !backgroundColorRaw;
+
+  const colorInputValue = isTransparent ? "#FFFFFF" : backgroundColorRaw;
+
+  const onBackgroundColorChange = (nextColor: string) => {
+    // если пользователь руками меняет цвет — вырубить автоподбор (иначе перезатрёт)
+    if (qrSettings.backgroundAutoPickEnabled) {
+      setQrSettings({ backgroundAutoPickEnabled: false });
+    }
+
+    setQrSettings({ backgroundColor: normalizeHex(nextColor) });
   };
 
   return (
@@ -108,27 +126,88 @@ export const BackgroundTab = () => {
         error={background.error}
         onError={setBackgroundError}
         showPreviewImage
+        previewSrc={background.dataUrl}
       />
 
       <div className="mt-6 grid gap-4">
-        <ZoneColorField
-          label="Цвет фона"
-          value={qrSettings.backgroundColor}
-          onChange={(nextColor) => {
-            // если пользователь руками меняет цвет — вырубить автоподбор
-            // (иначе он перезатрёт)
-            if (qrSettings.backgroundAutoPickEnabled) {
-              setQrSettings({ backgroundAutoPickEnabled: false });
-            }
-            setQrSettings({ backgroundColor: nextColor });
-          }}
-          disabled={isAutoPicking}
-        />
+        <div className="min-w-[240px]">
+          <div className="mb-[5px] text-[14px] font-normal text-[#9283C0]">
+            Цвет фона
+          </div>
+
+          <div className="relative w-[270px]">
+            {isTransparent && (
+              <div className="pointer-events-none absolute left-[14px] top-1/2 -translate-y-1/2 text-[14px] font-normal text-[#98A2B3]">
+                Прозрачный
+              </div>
+            )}
+
+            <MuiColorInput
+              value={colorInputValue}
+              onChange={onBackgroundColorChange}
+              format="hex"
+              isAlphaHidden
+              disabled={isAutoPicking}
+              sx={{
+                width: "270px",
+
+                "& .MuiOutlinedInput-root": {
+                  height: "44px",
+                  borderRadius: "8px",
+                  backgroundColor: "#FFFFFF",
+                  paddingRight: "4px",
+                  fontFamily: "Inter, sans-serif",
+                },
+
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#9283C0",
+                },
+
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#9283C0",
+                },
+
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#9283C0",
+                  borderWidth: "1px",
+                },
+
+                // когда "прозрачный" — прячем hex, чтобы не путать
+                "& .MuiOutlinedInput-input": {
+                  paddingLeft: "0px",
+                  paddingRight: "0px",
+                  fontSize: "14px",
+                  fontWeight: 400,
+                  color: isTransparent ? "transparent" : "#313131",
+                  fontFamily: "Inter, sans-serif",
+                },
+
+                "& .MuiOutlinedInput-input::selection": {
+                  backgroundColor: "rgba(146, 131, 192, 0.25)",
+                },
+
+                // палитра справа
+                "& .MuiInputAdornment-positionStart": {
+                  order: 2,
+                  marginLeft: "12px",
+                  marginRight: 0,
+                },
+
+                "& .MuiColorInput-Button": {
+                  width: "110px",
+                  height: "36px",
+                  borderRadius: "6px",
+                  border: "1px solid #9283C0",
+                  backgroundColor: "#FFFFFF",
+                },
+              }}
+            />
+          </div>
+        </div>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Typography sx={{ fontWeight: 400 }}>
-            Автоподбор цвета
-            {isAutoPicking ? "…" : ""}
+            Автоподбор цвета{isAutoPicking ? "…" : ""}
           </Typography>
 
           <Switch

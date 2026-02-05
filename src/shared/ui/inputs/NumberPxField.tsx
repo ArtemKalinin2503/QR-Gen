@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from "react";
 import { OutlinedInput } from "@mui/material";
 
 export type NumberPxFieldProps = {
@@ -7,15 +8,20 @@ export type NumberPxFieldProps = {
   min?: number;
   max?: number;
   step?: number;
-
+  // По умолчанию можно клампить на blur (для строгих полей).
+  // Для “можно любое, но ограничим в результате” — false.
+  clampOnBlur?: boolean;
   disabled?: boolean;
   className?: string;
+  isSectionLabel?: boolean;
 };
 
 const clamp = (value: number, min?: number, max?: number) => {
   const withMin = min === undefined ? value : Math.max(min, value);
   return max === undefined ? withMin : Math.min(max, withMin);
 };
+
+const toInputString = (value: number | "") => (value === "" ? "" : String(value));
 
 export const NumberPxField = ({
   value,
@@ -24,46 +30,82 @@ export const NumberPxField = ({
   min,
   max,
   step = 1,
+  clampOnBlur = true,
   disabled = false,
   className,
+  isSectionLabel
 }: NumberPxFieldProps) => {
-  const setNext = (nextValue: number) => onChange(clamp(nextValue, min, max));
+  const [inputValue, setInputValue] = useState<string>(toInputString(value));
 
-  const increase = () => {
-    const currentValue = value === "" ? 0 : value;
-    setNext(currentValue + step);
-  };
+  useEffect(() => {
+    const next = toInputString(value);
+    if (next !== inputValue) setInputValue(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 
-  const decrease = () => {
-    const currentValue = value === "" ? 0 : value;
-    setNext(currentValue - step);
-  };
-
-  const onInputChange = (rawValue: string) => {
-    if (!rawValue) {
+  const commitNumberIfPossible = (raw: string) => {
+    if (raw === "") {
       onChange("");
       return;
     }
 
-    const nextValue = Number(rawValue);
+    const parsed = Number(raw);
+    if (Number.isNaN(parsed)) return;
 
-    if (Number.isNaN(nextValue)) return;
+    onChange(parsed);
+  };
 
-    setNext(nextValue);
+  const increase = () => {
+    const currentValue = value === "" ? 0 : value;
+    const nextValue = clamp(currentValue + step, min, max);
+    onChange(nextValue);
+  };
+
+  const decrease = () => {
+    const currentValue = value === "" ? 0 : value;
+    const nextValue = clamp(currentValue - step, min, max);
+    onChange(nextValue);
+  };
+
+  const handleChange = (raw: string) => {
+    setInputValue(raw);
+    commitNumberIfPossible(raw);
+  };
+
+  const handleBlur = () => {
+    if (!clampOnBlur) return;
+    if (inputValue === "") return;
+
+    const parsed = Number(inputValue);
+    if (Number.isNaN(parsed)) return;
+
+    const clampedValue = clamp(parsed, min, max);
+
+    if (clampedValue !== parsed) {
+      onChange(clampedValue);
+      setInputValue(String(clampedValue));
+    }
   };
 
   return (
     <div className={className}>
       {label && (
-        <div className="mb-[5px] text-[14px] font-normal text-[#9283C0]">
+        <div
+          className={
+            isSectionLabel
+              ? "mb-[5px] text-[16px] font-semibold text-[#000000]"
+              : "mb-[5px] text-[14px] font-normal text-[#9283C0]"
+          }
+        >
           {label}
         </div>
       )}
 
       <div className="relative w-full max-w-[125px]">
         <OutlinedInput
-          value={value}
-          onChange={(event) => onInputChange(event.target.value)}
+          value={inputValue}
+          onChange={(event) => handleChange(event.target.value)}
+          onBlur={handleBlur}
           disabled={disabled}
           type="number"
           inputProps={{ min, max, step }}
@@ -102,12 +144,11 @@ export const NumberPxField = ({
           }}
         />
 
-        {/* px + кастомный степпер */}
         <div className="pointer-events-none absolute right-[6px] top-1/2 flex -translate-y-1/2 items-center gap-2">
           <div className="pointer-events-none absolute right-[6px] top-1/2 flex -translate-y-1/2 items-center gap-1">
             <div className="text-[14px] font-normal text-[#9283C0]">px</div>
 
-            <div className="pointer-events-auto flex flex-col max-h-[20px]">
+            <div className="pointer-events-auto flex max-h-[20px] flex-col">
               <button
                 type="button"
                 onClick={increase}

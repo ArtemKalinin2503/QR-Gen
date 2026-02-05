@@ -6,16 +6,12 @@ import type {
 import { HeaderNavigation } from "./features/qr-generation/ui/HeaderNavigation";
 import { QrPreviewPanel } from "./features/qr-generation/ui/QrPreviewPanel";
 import { SettingsPanel } from "./features/qr-generation/ui/SettingsPanel";
-import { useQrGeneratorStore } from "./store/qrGenerator.store";
 
 function App() {
   const [activeGeneratorType, setActiveGeneratorType] =
     useState<GeneratorType>("registry");
   const [activeSettingsTab, setActiveSettingsTab] =
     useState<SettingsTabKey>("basic");
-
-  const registry = useQrGeneratorStore((state) => state.registry);
-  const qrSettings = useQrGeneratorStore((state) => state.qrSettings);
 
   const onGeneratorTypeChange = (nextType: GeneratorType) => {
     setActiveGeneratorType(nextType);
@@ -45,17 +41,6 @@ function App() {
             </div>
           </aside>
         </main>
-
-        {/* временно для проверки, потом удалить */}
-        <aside className="w-[460px]">
-          <pre className="mt-4 max-h-[320px] overflow-auto rounded-[10px] bg-white p-4 text-[12px] text-gray-800 shadow-card">
-            {JSON.stringify(
-              { registry, qrSettings, activeGeneratorType },
-              null,
-              2,
-            )}
-          </pre>
-        </aside>
       </div>
     </div>
   );

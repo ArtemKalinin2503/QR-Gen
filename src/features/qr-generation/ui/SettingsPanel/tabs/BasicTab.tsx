@@ -88,6 +88,9 @@ const RegistrySection = () => {
 
   const hasValidationErrors = registry.validationErrors.length > 0;
 
+  const registryErrorText =
+    registry.error || (hasValidationErrors ? "Реестр содержит ошибки" : "");
+
   return (
     <>
       <FileUploadField
@@ -98,15 +101,32 @@ const RegistrySection = () => {
         icon={<IconFileCsv size={40} />}
         onFileSelected={onFileSelected}
         onDelete={resetRegistry}
-        error={registry.error || (hasValidationErrors ? "Реестр содержит ошибки" : "")}
+        error={registryErrorText}
         onError={setRegistryError}
+        footer={
+          <div className="grid gap-3">
+            {registryErrorText && (
+              <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                {registryErrorText}
+              </div>
+            )}
+
+            {registry.rows.length > 0 && (
+              <div className="text-[14px] font-normal text-[#002033] opacity-[60%]">
+                Строк в реестре: {registry.rows.length}
+              </div>
+            )}
+          </div>
+        }
       />
 
       <RegistryValidationModal
         open={registry.isValidationModalOpen}
         errors={registry.validationErrors}
         onClose={closeModal}
-        onDownloadReport={() => downloadRegistryValidationReport(registry.validationErrors)}
+        onDownloadReport={() =>
+          downloadRegistryValidationReport(registry.validationErrors)
+        }
       />
     </>
   );
@@ -115,13 +135,50 @@ const RegistrySection = () => {
 const MAX_ROWS = 150_000;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
+const splitCsvLineBySemicolon = (line: string) => {
+  const result: string[] = [];
+  let current = "";
+  let isInQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+
+    if (char === '"') {
+      const next = line[i + 1];
+
+      if (isInQuotes && next === '"') {
+        current += '"';
+        i += 1;
+        continue;
+      }
+
+      isInQuotes = !isInQuotes;
+      continue;
+    }
+
+    if (char === ";" && !isInQuotes) {
+      result.push(current);
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  result.push(current);
+  return result;
+};
+
 const parseRegistry = async (registry: File): Promise<RegistryRow[]> => {
   if (registry.size > MAX_FILE_SIZE_BYTES) {
     throw new Error("Файл реестра не должен превышать 10 МБ");
   }
 
   const body = (await registry.text()).replace(/^\uFEFF/, "");
-  const lines = body.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const lines = body
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
 
   if (!lines.length) {
     throw new Error("В реестре нет строк");
@@ -135,7 +192,7 @@ const parseRegistry = async (registry: File): Promise<RegistryRow[]> => {
 
   for (let index = 0; index < lines.length; index += 1) {
     const row = lines[index];
-    const columns = row.split(";");
+    const columns = splitCsvLineBySemicolon(row);
 
     if (columns.length !== COLUMN_COUNT) {
       throw new Error(

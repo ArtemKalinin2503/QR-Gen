@@ -1,6 +1,9 @@
 import QRCodeStyling from "qr-code-styling";
 import { downloadZip, type InputWithSizeMeta } from "client-zip";
-import { buildQrCodeOptions } from "./buildQrCodeOptions";
+import {
+  buildQrCodeOptions,
+  getEffectiveQuietZonePx,
+} from "./buildQrCodeOptions";
 import { applyBackgroundToQrSvg } from "./applyBackgroundToQrSvg";
 import { applySignatureToQrSvg } from "./applySignatureToQrSvg";
 
@@ -31,8 +34,17 @@ export async function generateQrCodes({
   const files: InputWithSizeMeta[] = [];
 
   const safeZoneEnabled = Boolean(qrSettings.hasSafeZone);
-  const safeZoneMargin = safeZoneEnabled ? Number(qrSettings.safeZoneSizePx || 0) : 0;
-  const safeZoneFill = safeZoneEnabled ? String(qrSettings.safeZoneColor || "#FFFFFF") : "";
+  const safeZoneMargin = safeZoneEnabled
+    ? getEffectiveQuietZonePx(
+        qrSettings.sizePx,
+        Number(qrSettings.safeZoneSizePx || 0),
+      )
+    : 0;
+
+  const safeZoneFill = safeZoneEnabled
+    ? String(qrSettings.safeZoneColor || "#FFFFFF")
+    : "";
+
   const innerFill = String(qrSettings.backgroundColor || "#FFFFFF");
   const shouldForceTransparentBg = Boolean(backgroundDataUrl) || safeZoneEnabled;
 
@@ -44,7 +56,9 @@ export async function generateQrCodes({
         qrSettings,
         logoBase64,
         qrColor: "#000000",
-        backgroundFallbackColor: shouldForceTransparentBg ? "transparent" : "#ffffff",
+        backgroundFallbackColor: shouldForceTransparentBg
+          ? "transparent"
+          : "#ffffff",
         forceTransparentBackground: shouldForceTransparentBg,
       }),
     );

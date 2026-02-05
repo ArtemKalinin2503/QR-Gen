@@ -43,7 +43,6 @@ type BuildQrCodeOptionsParams = {
   qrColor: string;
   backgroundFallbackColor: string;
 
-  // если true — делаем фон QR прозрачным (для подложки-картинки в UI)
   forceTransparentBackground?: boolean;
 };
 
@@ -75,6 +74,19 @@ const clampLogoSizeRatio = (ratio: number) => {
   return Math.min(maxRatio, Math.max(0.05, ratio));
 };
 
+export const getMinQuietZonePx = (qrSizePx: number) => {
+  const approxModulePx = qrSizePx / 41;
+  const minByModules = 4 * approxModulePx;
+  const minByPercent = qrSizePx * 0.1;
+
+  return Math.ceil(Math.max(minByModules, minByPercent));
+};
+
+export const getEffectiveQuietZonePx = (
+  qrSizePx: number,
+  requestedQuietZonePx: number,
+) => Math.max(requestedQuietZonePx, getMinQuietZonePx(qrSizePx));
+
 export const buildQrCodeOptions = ({
   data,
   sizePx,
@@ -84,8 +96,9 @@ export const buildQrCodeOptions = ({
   backgroundFallbackColor,
   forceTransparentBackground,
 }: BuildQrCodeOptionsParams): Options => {
-  // quiet zone = margin самого QR
-  const qrMargin = qrSettings.hasSafeZone ? qrSettings.safeZoneSizePx : 0;
+  const qrMargin = qrSettings.hasSafeZone
+    ? getEffectiveQuietZonePx(sizePx, qrSettings.safeZoneSizePx)
+    : 0;
 
   const dotsType =
     qrSettings.dotsTypeMode === "manual"
@@ -112,13 +125,10 @@ export const buildQrCodeOptions = ({
       })
     : undefined;
 
-  // фон QR:
-  // - если подложка-картинка в UI — фон делаем прозрачным
-  // - иначе берём backgroundColor из настроек
-  // - если пусто — fallback
+  const normalizedBackground = (qrSettings.backgroundColor || "").trim();
   const effectiveBackgroundColor = forceTransparentBackground
     ? "transparent"
-    : (qrSettings.backgroundColor || "").trim() || backgroundFallbackColor;
+    : normalizedBackground || backgroundFallbackColor;
 
   return {
     width: sizePx,
@@ -153,7 +163,6 @@ export const buildQrCodeOptions = ({
       crossOrigin: "anonymous",
       imageSize: logoBase64 ? logoRatio : 0,
       hideBackgroundDots: Boolean(logoBase64),
-      // margin вокруг логотипа (не quiet zone)
       margin: 0,
     },
   };

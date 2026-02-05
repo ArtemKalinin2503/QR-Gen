@@ -9,7 +9,6 @@ type CornerSquareType =
 type CornerDotType =
   NonNullable<NonNullable<Options["cornersDotOptions"]>["type"]>;
 
-// Наборы - Стиль формы
 const DOT_TYPES = [
   "dots",
   "rounded",
@@ -19,14 +18,12 @@ const DOT_TYPES = [
   "classy-rounded",
 ] as const satisfies readonly DotType[];
 
-// Наборы - Стиль внешних границ
 const CORNER_SQUARE_TYPES = [
   "square",
   "extra-rounded",
   "dot",
 ] as const satisfies readonly CornerSquareType[];
 
-// Наборы - Стиль внутренних границ
 const CORNER_DOT_TYPES = [
   "dot",
   "rounded",
@@ -63,14 +60,11 @@ const buildPreviewOptions = (params: {
 
   return {
     backgroundOptions: { color: PREVIEW_BG_COLOR },
-
     dotsOptions: { type: params.dotsType, color: dotsColor },
-
     cornersSquareOptions: {
       type: params.cornersSquareType,
       color: cornersSquareColor,
     },
-
     cornersDotOptions: {
       type: params.cornersDotType,
       color: cornersDotColor,
@@ -84,11 +78,10 @@ export const StylesTab = () => {
 
   return (
     <div className="pt-6">
-      {/* Стиль формы */}
       <div className="mb-8">
         <div className="text-[16px] font-semibold text-gray-900">Стиль формы</div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-[15px] flex flex-wrap gap-[15px]">
           {DOT_TYPES.map((dotsType) => (
             <QrStylePreviewButton
               key={dotsType}
@@ -109,7 +102,7 @@ export const StylesTab = () => {
           ))}
         </div>
 
-        <div className="mt-3">
+        <div className="mt-[15px]">
           <ZoneColorField
             label="Цвет"
             value={qrSettings.dotsColor}
@@ -118,13 +111,12 @@ export const StylesTab = () => {
         </div>
       </div>
 
-      {/* Стиль внешних границ */}
       <div className="mb-8">
         <div className="text-[16px] font-semibold text-gray-900">
           Стиль внешних границ
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-[15px] flex flex-wrap gap-[15px]">
           {CORNER_SQUARE_TYPES.map((cornersSquareType) => (
             <QrStylePreviewButton
               key={cornersSquareType}
@@ -148,7 +140,7 @@ export const StylesTab = () => {
           ))}
         </div>
 
-        <div className="mt-3">
+        <div className="mt-[15px] mb-[15px]">
           <ZoneColorField
             label="Цвет"
             value={qrSettings.cornersSquareColor}
@@ -159,13 +151,12 @@ export const StylesTab = () => {
         </div>
       </div>
 
-      {/* Стиль внутренних границ */}
       <div>
         <div className="text-[16px] font-semibold text-gray-900">
           Стиль внутренних границ
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-[15px] flex flex-wrap gap-[15px]">
           {CORNER_DOT_TYPES.map((cornersDotType) => (
             <QrStylePreviewButton
               key={cornersDotType}
@@ -186,7 +177,7 @@ export const StylesTab = () => {
           ))}
         </div>
 
-        <div className="mt-3">
+        <div className="mt-[15px]">
           <ZoneColorField
             label="Цвет"
             value={qrSettings.cornersDotColor}
